@@ -9,12 +9,19 @@ fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let _len: usize = buf_reader.read_line(&mut buf)?;
 
-    let first_line: &str = &buf;
+    let first_line: &str = buf.trim();
 
-    match first_line.trim() {
-        "GET / HTTP/1.1" => stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes()),
-        _ => stream.write_all("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes()),
-    }?;
+    if first_line == "GET / HTTP/1.1" {
+        stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes())?;
+    } else if first_line.starts_with("GET /echo/") {
+        let message = first_line
+            .replace("GET /echo/", "")
+            .replace(" HTTP/1.1", "");
+        let len = message.len();
+        stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len}\r\n\r\n{message}").as_bytes())?;
+    } else {
+        stream.write_all("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())?;
+    }
 
     Ok(())
 }
