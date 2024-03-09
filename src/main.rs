@@ -3,13 +3,24 @@ use std::io::{prelude::*, BufReader};
 use std::net::{TcpListener, TcpStream};
 
 fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
-    let mut buf = String::new();
+    let mut content = vec![];
 
     let mut buf_reader = BufReader::new(&stream);
 
-    let _len: usize = buf_reader.read_line(&mut buf)?;
+    loop {
+        let mut buf = String::new();
+        let _len: usize = buf_reader.read_line(&mut buf)?;
 
-    let first_line: &str = buf.trim();
+        if &buf == "\r\n" {
+            break;
+        }
+
+        content.push(buf);
+    }
+
+    let first_line: &str = content[0].trim();
+
+    println!("{}", &first_line);
 
     if first_line == "GET / HTTP/1.1" {
         stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes())?;
@@ -18,6 +29,14 @@ fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             .replace("GET /echo/", "")
             .replace(" HTTP/1.1", "");
         let len = message.len();
+        stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len}\r\n\r\n{message}").as_bytes())?;
+    } else if first_line.starts_with("GET /user-agent") {
+        let message = content
+            .iter()
+            .find(|line| line.starts_with("User-Agent: "))
+            .unwrap()
+            .replace("User-Agent: ", "");
+        let len = message.trim().len();
         stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len}\r\n\r\n{message}").as_bytes())?;
     } else {
         stream.write_all("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())?;
