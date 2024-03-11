@@ -1,5 +1,7 @@
 use crate::pool::ThreadPool;
+use std::env;
 use std::error::Error;
+use std::fs::File;
 use std::io::{prelude::*, BufReader};
 use std::net::{TcpListener, TcpStream};
 
@@ -26,6 +28,26 @@ fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     if first_line == "GET / HTTP/1.1" {
         stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes())?;
+    } else if first_line.starts_with("GET /files/") {
+        let args: Vec<String> = env::args().collect();
+
+        let directory = args.last().unwrap();
+
+        let filename = first_line
+            .replace("GET /files/", "")
+            .replace(" HTTP/1.1", "");
+
+        if let Ok(mut file) = File::open(format!("{directory}{filename}")) {
+            let mut content = vec![];
+            let len = file.read_to_end(&mut content)?;
+
+            println!("{}", len);
+
+            stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {len}\r\n\r\n").as_bytes())?;
+            stream.write_all(&content)?;
+        } else {
+            stream.write_all("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())?;
+        }
     } else if first_line.starts_with("GET /echo/") {
         let message = first_line
             .replace("GET /echo/", "")
