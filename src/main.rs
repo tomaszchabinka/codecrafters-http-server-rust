@@ -1,10 +1,12 @@
+use crate::pool::ThreadPool;
 use std::error::Error;
 use std::io::{prelude::*, BufReader};
 use std::net::{TcpListener, TcpStream};
 
+pub mod pool;
+
 fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut content = vec![];
-
     let mut buf_reader = BufReader::new(&stream);
 
     loop {
@@ -42,6 +44,8 @@ fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         stream.write_all("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())?;
     }
 
+    println!("Done!");
+
     Ok(())
 }
 
@@ -50,12 +54,13 @@ fn main() {
     println!("Logs from your program will appear here!");
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
+    let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => {
+            Ok(stream) => pool.execute(|| {
                 let _ = handle_client(stream);
-            }
+            }),
             Err(e) => {
                 println!("error: {}", e);
             }
