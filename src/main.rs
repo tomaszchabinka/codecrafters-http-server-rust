@@ -24,8 +24,6 @@ fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let first_line: &str = content[0].trim();
 
-    println!("{}", &first_line);
-
     if first_line == "GET / HTTP/1.1" {
         stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes())?;
     } else if first_line.starts_with("GET /files/") {
@@ -62,6 +60,30 @@ fn handle_client(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             .replace("User-Agent: ", "");
         let len = message.trim().len();
         stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len}\r\n\r\n{message}").as_bytes())?;
+    } else if first_line.starts_with("POST /files") {
+        let args: Vec<String> = env::args().collect();
+
+        let directory = args.last().unwrap();
+
+        let filename = first_line
+            .replace("POST /files/", "")
+            .replace(" HTTP/1.1", "");
+
+        let size = content
+            .iter()
+            .find(|line| line.starts_with("Content-Length: "))
+            .unwrap()
+            .replace("Content-Length: ", "")
+            .trim()
+            .parse::<usize>()
+            .unwrap();
+
+        let mut buffer = vec![0; size];
+        buf_reader.read_exact(&mut buffer).unwrap();
+
+        std::fs::write(format!("{directory}{filename}"), &buffer)?;
+
+        stream.write_all("HTTP/1.1 201 CREATED\r\n\r\n".as_bytes())?;
     } else {
         stream.write_all("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())?;
     }
